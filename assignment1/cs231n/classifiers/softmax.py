@@ -30,7 +30,20 @@ def softmax_loss_naive(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+
+  F = X.dot(W)
+  for i, (f, y) in enumerate(zip(F, y)):
+    f -= np.max(f)
+    loss += -f[y] + np.log(np.sum(np.exp(f)))
+    probs = np.ones(dW.shape) * (np.exp(f) / np.sum(np.exp(f)))
+    probs[:, y] -= 1
+    dW += (X[i].reshape(X[i].shape[0], 1)) * np.ones(dW.shape) * probs
+
+  loss /= X.shape[0]
+  dW /= X.shape[0]
+  loss += 0.5 * reg * np.sum(W * W)
+  dW += reg * W
+
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
@@ -54,7 +67,21 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+
+  F = X.dot(W)
+  F -= np.max(F, axis = 1).reshape(F.shape[0], -1)
+  denom = np.sum(np.exp(F), axis=1)  # D, 1
+  loss = np.sum(-np.log( np.exp(F[np.arange(F.shape[0]), y]) / denom))
+
+  prob = np.exp(F) / denom.reshape(denom.shape[0], -1)  # D, C
+  prob[np.arange(0, prob.shape[0]), y] -= 1
+  dW = X.T.dot(prob)
+
+  loss /= X.shape[0]
+  dW /= X.shape[0]
+  loss += 0.5 * reg * np.sum(W * W)
+  dW += reg * W
+
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
