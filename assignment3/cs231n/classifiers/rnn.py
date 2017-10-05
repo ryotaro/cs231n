@@ -137,12 +137,13 @@ class CaptioningRNN(object):
         # defined above to store loss and gradients; grads[k] should give the      #
         # gradients for self.params[k].                                            #
         ############################################################################
+        ########## FORWARD PASS
         N, D = features.shape
         _, T = captions.shape
         # aff_out: (N, H)
         aff_out = features.dot(W_proj) + b_proj
         # word_out: (N, T, D)
-        word_out, word_cache = word_embedding_forward(captions, W_embed)
+        word_out, word_cache = word_embedding_forward(captions_in, W_embed)
         if self.cell_type == 'rnn':
           # rnn_out: (N, T, H)
           rnn_out, rnn_cache = rnn_forward(word_out, aff_out, Wx, Wh, b)
@@ -151,7 +152,18 @@ class CaptioningRNN(object):
 
         # score_out: (N, T, V)
         score_out, score_cache = temporal_affine_forward(rnn_out, W_vocab, b_vocab)
-        temporal_softmax_loss(score_out, y, )
+        loss, dout = temporal_softmax_loss(score_out, captions_out, mask)
+
+        ########## BACKWARD PASS
+        # (N,T,D), (D, M), (M, )
+        dscore_x, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dout, score_cache)
+        drnn_x, drnn_h0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dscore_x, rnn_cache)
+        grads['W_embed']= word_embedding_backward(drnn_x, word_cache)
+
+        grads['W_proj'] = features.T.dot(drnn_h0)
+        grads['b_proj'] = drnn_h0.sum(axis=0)
+
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
