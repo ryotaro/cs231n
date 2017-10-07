@@ -198,7 +198,7 @@ def word_embedding_forward(x, W):
     ##############################################################################
     N, T = x.shape
     V, D = W.shape
-    out = W[x.reshape((-1, 1)), :].reshape((N, T, D))
+    out = W[x.reshape((-1, 1)).astype(int), :].reshape((N, T, D))
     cache = {
         'x': x,
         'W': W
