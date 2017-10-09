@@ -148,7 +148,7 @@ class CaptioningRNN(object):
           # rnn_out: (N, T, H)
           rnn_out, rnn_cache = rnn_forward(word_out, aff_out, Wx, Wh, b)
         else:
-          raise RuntimeError('oh shit')
+          rnn_out, rnn_cache = lstm_forward(word_out, aff_out, Wx, Wh, b)
 
         # score_out: (N, T, V)
         score_out, score_cache = temporal_affine_forward(rnn_out, W_vocab, b_vocab)
@@ -157,12 +157,14 @@ class CaptioningRNN(object):
         ########## BACKWARD PASS
         # (N,T,D), (D, M), (M, )
         dscore_x, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dout, score_cache)
-        drnn_x, drnn_h0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dscore_x, rnn_cache)
-        grads['W_embed']= word_embedding_backward(drnn_x, word_cache)
+        if self.cell_type == 'rnn':
+          drnn_x, drnn_h0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dscore_x, rnn_cache)
+        else:
+          drnn_x, drnn_h0, grads['Wx'], grads['Wh'], grads['b'] = lstm_backward(dscore_x, rnn_cache)
 
+        grads['W_embed']= word_embedding_backward(drnn_x, word_cache)
         grads['W_proj'] = features.T.dot(drnn_h0)
         grads['b_proj'] = drnn_h0.sum(axis=0)
-
 
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -230,9 +232,13 @@ class CaptioningRNN(object):
         # self._end = word_to_idx.get('<END>', None)
         h_prev = features.dot(W_proj) + b_proj
         x_prev = np.zeros((N, 1)) + self._start
+        c_prev = np.zeros_like(h_prev)
         for t in range(max_length):
           x, _ = word_embedding_forward(x_prev, W_embed)
-          h_prev, _ = rnn_step_forward(x.reshape((N, -1)), h_prev, Wx, Wh, b)
+          if self.cell_type == 'rnn':
+            h_prev, _ = rnn_step_forward(x.reshape((N, -1)), h_prev, Wx, Wh, b)
+          else:
+            h_prev, c_prev, _ = lstm_step_forward(x.reshape((N, -1)), h_prev, c_prev, Wx, Wh, b)
           word = h_prev.dot(W_vocab) + b_vocab
           idx = np.argmax(word, axis=1)
           captions[:, t] = idx
